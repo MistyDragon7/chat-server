@@ -1,0 +1,38 @@
+# Build directory
+/build/
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Compiled object files and binaries
+*.o
+*.out
+*.a
+*.so
+*.exe
+
+# Editor files
+*.swp
+*~
+.vscode/
+.idea/
+
+# Logs and dumps
+*.log
+*.core
+core.*
+
+# macOS/Linux specific
+.DS_Store
+
+# Backup files
+*.bak
+
+# Catch2 test binaries (if added later)
+test*
+
+# Sanitizer output (optional)
+*.tsan
+*.asan
