@@ -36,3 +36,4 @@ test*
 # Sanitizer output (optional)
 *.tsan
 *.asan
+cool/
