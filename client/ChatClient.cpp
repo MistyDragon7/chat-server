@@ -1,59 +1,107 @@
-// chatClient.cpp
+#include "ChatClient.hpp"
 #include <iostream>
-#include <cstring>
 #include <unistd.h>
+#include <cstring>
 #include <arpa/inet.h>
-#include <string>
 
-#define PORT 9000
+ChatClient::ChatClient(const std::string &server_ip, int port)
+    : server_ip_(server_ip), port_(port), sock_(-1), connected_(false) {}
 
-int ChatClient()
+ChatClient::~ChatClient()
 {
-    int sock = 0;
-    struct sockaddr_in serv_addr;
+    cleanup();
+}
 
-    // 1. Create socket
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0)
+void ChatClient::connect_to_server()
+{
+    sock_ = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock_ < 0)
     {
-        perror("socket creation error");
-        return 1;
+        perror("Socket creation failed");
+        exit(1);
     }
 
+    sockaddr_in serv_addr{};
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
+    serv_addr.sin_port = htons(port_);
 
-    // 2. Convert address
-    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0)
+    if (inet_pton(AF_INET, server_ip_.c_str(), &serv_addr.sin_addr) <= 0)
     {
-        std::cerr << "Invalid address / Address not supported\n";
-        return 1;
+        std::cerr << "Invalid address\n";
+        exit(1);
     }
 
-    // 3. Connect
-    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    if (connect(sock_, (sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
-        perror("connection failed");
-        return 1;
+        perror("Connection failed");
+        exit(1);
     }
-    std::cout << "Connected to server. Type messages to send. Type 'exit' to quit.\n";
-    while (true)
+
+    connected_ = true;
+}
+
+void ChatClient::receive_messages()
+{
+    char buffer[1024];
+    while (connected_)
     {
-        std::string input;
-        std::getline(std::cin, input);
-        if (input == "exit")
-            break;
-        send(sock, input.c_str(), input.size(), 0);
-        send(sock, "\n", 1, 0);
-        char buffer[1024] = {0};
-        int valread = recv(sock, buffer, sizeof(buffer), 0);
-        if (valread <= 0)
+        ssize_t bytes_received = recv(sock_, buffer, sizeof(buffer) - 1, 0);
+        if (bytes_received <= 0)
         {
-            std::cerr << "Server disconnected or error: \n";
+            std::cout << "\nDisconnected from server.\n";
             break;
         }
-        std::cout << "Server says: " << buffer << std::endl;
+        buffer[bytes_received] = '\0';
+
+        std::string message(buffer);
+        if (!message.empty() && message.back() == '\n')
+        {
+            message.pop_back();
+        }
+
+        std::cout << "\r" << message << "\n> " << std::flush;
     }
-    close(sock);
-    return 0;
+
+    connected_ = false;
+}
+
+void ChatClient::send_messages()
+{
+    std::string username;
+    std::cout << "Enter your username: ";
+    std::getline(std::cin, username);
+    send(sock_, username.c_str(), username.length(), 0);
+
+    std::string message;
+    std::cout << "> ";
+    while (std::getline(std::cin, message))
+    {
+        if (message == "/quit" || std::cin.eof())
+            break;
+
+        message += "\n";
+        send(sock_, message.c_str(), message.length(), 0);
+        std::cout << "> ";
+    }
+
+    connected_ = false;
+    std::cout << "[You have left the chat]\n";
+}
+
+void ChatClient::run()
+{
+    connect_to_server();
+    receiver_thread_ = std::thread(&ChatClient::receive_messages, this);
+    send_messages();
+    receiver_thread_.detach();
+    cleanup();
+}
+
+void ChatClient::cleanup()
+{
+    if (sock_ != -1)
+    {
+        close(sock_);
+        sock_ = -1;
+    }
 }

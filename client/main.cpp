@@ -1,12 +1,8 @@
-// main.cpp
-#include <iostream>
-#include <thread>
-#include <chrono>
-
-extern int ChatClient();
+#include "ChatClient.hpp"
 
 int main()
 {
-    ChatClient();
+    ChatClient client("127.0.0.1", 9000);
+    client.run();
     return 0;
 }
