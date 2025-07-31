@@ -1,4 +1,5 @@
 #include "ChatClient.hpp"
+#include "Color.hpp"
 #include <iostream>
 #include <unistd.h>
 #include <cstring>
@@ -27,7 +28,9 @@ void ChatClient::connect_to_server()
 
     if (inet_pton(AF_INET, server_ip_.c_str(), &serv_addr.sin_addr) <= 0)
     {
-        std::cerr << "Invalid address\n";
+        std::cerr << COLOR_RED << "Invalid address\n"
+                  << COLOR_RESET;
+
         exit(1);
     }
 
@@ -59,7 +62,8 @@ void ChatClient::receive_messages()
             message.pop_back();
         }
 
-        std::cout << "\r" << message << "\n> " << std::flush;
+        std::cout << COLOR_YELLOW << "\r" << message << COLOR_RESET << "\n"
+                  << COLOR_CYAN << "> " << COLOR_RESET << std::flush;
     }
 
     connected_ = false;
@@ -68,12 +72,12 @@ void ChatClient::receive_messages()
 void ChatClient::send_messages()
 {
     std::string username;
-    std::cout << "Enter your username: ";
+    std::cout << COLOR_BLUE << "Enter your username: " << COLOR_RESET;
     std::getline(std::cin, username);
     send(sock_, username.c_str(), username.length(), 0);
 
     std::string message;
-    std::cout << "> ";
+    std::cout << COLOR_CYAN << "> " << COLOR_RESET;
     while (std::getline(std::cin, message))
     {
         if (message == "/quit" || std::cin.eof())
@@ -81,11 +85,13 @@ void ChatClient::send_messages()
 
         message += "\n";
         send(sock_, message.c_str(), message.length(), 0);
-        std::cout << "> ";
+
+        std::cout << COLOR_CYAN << "> " << COLOR_RESET;
     }
 
     connected_ = false;
-    std::cout << "[You have left the chat]\n";
+    std::cout << COLOR_MAGENTA << "[You have left the chat]\n"
+              << COLOR_RESET;
 }
 
 void ChatClient::run()
