@@ -1,12 +1,15 @@
-Hi.
+How to build?
 
+```
+mkdir -p build
+cd build
+cmake ..
+make
+```
 
-Compilation command for ChatClient:
+How to run?
 ```
-g++ main.cpp ChatClient.cpp -o chat_clients -pthread
+cd build
+./chat_server
+./chat_client
 ```
-
-Server Compilation:
-```
- g++ main.cpp -o server -pthread
- ```
