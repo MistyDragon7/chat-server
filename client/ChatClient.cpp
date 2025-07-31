@@ -78,7 +78,7 @@ void ChatClient::receive_messages()
     char buffer[1024];
     while (connected_)
     {
-        ssize_t bytes_received = recv(sock_, buffer, sizeof(buffer) - 1, 0);
+        int bytes_received = recv(sock_, buffer, sizeof(buffer) - 1, 0);
         if (bytes_received <= 0)
         {
             std::cout << "\nDisconnected from server.\n";
@@ -104,7 +104,7 @@ void ChatClient::send_messages()
     std::string username;
     std::cout << COLOR_BLUE << "Enter your username: " << COLOR_RESET;
     std::getline(std::cin, username);
-    send(sock_, username.c_str(), username.length(), 0);
+    send(sock_, username.c_str(), static_cast<int>(username.length()), 0);
 
     std::string message;
     std::cout << COLOR_CYAN << "> " << COLOR_RESET;
@@ -114,7 +114,7 @@ void ChatClient::send_messages()
             break;
 
         message += "\n";
-        send(sock_, message.c_str(), message.length(), 0);
+        send(sock_, message.c_str(), static_cast<int>(message.length()), 0);
 
         std::cout << COLOR_CYAN << "> " << COLOR_RESET;
     }

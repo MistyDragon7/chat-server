@@ -52,7 +52,7 @@ void ChatServer::start()
     int opt = 1;
     socklen_t addlen = sizeof(address);
 
-    server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
+    server_fd_ = static_cast<int>(socket(AF_INET, SOCK_STREAM, 0));
     if (server_fd_ < 0)
     {
         perror("Socket failed");
@@ -90,7 +90,7 @@ void ChatServer::accept_clients()
 {
     while (running_)
     {
-        int client_socket = accept(server_fd_, nullptr, nullptr);
+        int client_socket = static_cast<int>(accept(server_fd_, nullptr, nullptr));
         if (client_socket < 0)
         {
             perror("Accept failed");
@@ -103,7 +103,7 @@ void ChatServer::accept_clients()
 void ChatServer::handle_client(int client_socket)
 {
     char name_buffer[100] = {0};
-    ssize_t name_len = recv(client_socket, name_buffer, sizeof(name_buffer) - 1, 0);
+    int name_len = recv(client_socket, name_buffer, sizeof(name_buffer) - 1, 0);
     if (name_len <= 0)
     {
         CLOSE_SOCKET(client_socket);
@@ -125,7 +125,7 @@ void ChatServer::handle_client(int client_socket)
 
     while (true)
     {
-        ssize_t bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+        int bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
         if (bytes_received <= 0)
         {
             break;
@@ -159,7 +159,7 @@ void ChatServer::broadcast(const std::string &message, int sender_socket)
     {
         if (client_socket != sender_socket)
         {
-            send(client_socket, message.c_str(), message.length(), 0);
+            send(client_socket, message.c_str(), static_cast<int>(message.length()), 0);
         }
     }
 }
