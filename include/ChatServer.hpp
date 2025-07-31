@@ -3,11 +3,23 @@
 #ifndef CHAT_SERVER_HPP
 #define CHAT_SERVER_HPP
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+typedef int socklen_t;
+#else
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#define closesocket close
+#endif
+
 #include <string>
 #include <vector>
 #include <thread>
 #include <mutex>
-#include <netinet/in.h>
 
 class ChatServer
 {

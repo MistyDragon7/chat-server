@@ -1,11 +1,28 @@
-// server/ChatServer.cpp
-
+// ChatServer.cpp (Cross-platform)
 #include "../include/ChatServer.hpp"
 #include <iostream>
+#include <thread>
+#include <mutex>
+#include <vector>
+#include <string>
+#include <cstring>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+#else
 #include <unistd.h>
 #include <sys/socket.h>
-#include <cstring>
+#include <netinet/in.h>
 #include <arpa/inet.h>
+#endif
+
+#ifdef _WIN32
+#define CLOSE_SOCKET closesocket
+#else
+#define CLOSE_SOCKET close
+#endif
 
 ChatServer::ChatServer(int port) : port_(port), server_fd_(-1) {}
 
@@ -13,23 +30,40 @@ ChatServer::~ChatServer()
 {
     if (server_fd_ != -1)
     {
-        close(server_fd_);
+        CLOSE_SOCKET(server_fd_);
     }
+#ifdef _WIN32
+    WSACleanup();
+#endif
 }
 
 void ChatServer::start()
 {
+#ifdef _WIN32
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+    {
+        std::cerr << "WSAStartup failed\n";
+        exit(EXIT_FAILURE);
+    }
+#endif
+
     struct sockaddr_in address;
     int opt = 1;
     socklen_t addlen = sizeof(address);
 
-    server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd_ == 0)
+    server_fd_ = static_cast<int>(socket(AF_INET, SOCK_STREAM, 0));
+    if (server_fd_ < 0)
     {
         perror("Socket failed");
         exit(EXIT_FAILURE);
     }
+
+#ifndef _WIN32
     setsockopt(server_fd_, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+#else
+    setsockopt(server_fd_, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt));
+#endif
 
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
@@ -49,7 +83,6 @@ void ChatServer::start()
 
     running_ = true;
     std::cout << "Server listening on port: " << port_ << std::endl;
-
     accept_clients();
 }
 
@@ -57,7 +90,7 @@ void ChatServer::accept_clients()
 {
     while (running_)
     {
-        int client_socket = accept(server_fd_, nullptr, nullptr);
+        int client_socket = static_cast<int>(accept(server_fd_, nullptr, nullptr));
         if (client_socket < 0)
         {
             perror("Accept failed");
@@ -70,10 +103,10 @@ void ChatServer::accept_clients()
 void ChatServer::handle_client(int client_socket)
 {
     char name_buffer[100] = {0};
-    ssize_t name_len = recv(client_socket, name_buffer, sizeof(name_buffer) - 1, 0);
+    int name_len = recv(client_socket, name_buffer, sizeof(name_buffer) - 1, 0);
     if (name_len <= 0)
     {
-        close(client_socket);
+        CLOSE_SOCKET(client_socket);
         return;
     }
 
@@ -92,7 +125,7 @@ void ChatServer::handle_client(int client_socket)
 
     while (true)
     {
-        ssize_t bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+        int bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
         if (bytes_received <= 0)
         {
             break;
@@ -112,7 +145,7 @@ void ChatServer::handle_client(int client_socket)
         }
     }
     remove_client(client_socket);
-    close(client_socket);
+    CLOSE_SOCKET(client_socket);
 
     std::string goodbye = "[Server]: " + username + " has left the chat.\n";
     broadcast(goodbye, -1);
@@ -126,7 +159,7 @@ void ChatServer::broadcast(const std::string &message, int sender_socket)
     {
         if (client_socket != sender_socket)
         {
-            send(client_socket, message.c_str(), message.length(), 0);
+            send(client_socket, message.c_str(), static_cast<int>(message.length()), 0);
         }
     }
 }

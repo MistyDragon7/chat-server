@@ -1,9 +1,31 @@
-#include "ChatClient.hpp"
-#include "Color.hpp"
+#include "../include/ChatClient.hpp"
+#include "../include/Color.hpp"
 #include <iostream>
-#include <unistd.h>
+#include <thread>
+#include <string>
 #include <cstring>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
+#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "iphlpapi.lib")
+#else
+#include <unistd.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
+#include <net/if.h>
+#endif
+
+#ifdef _WIN32
+#define CLOSE_SOCKET closesocket
+#else
+#define CLOSE_SOCKET close
+#endif
 
 ChatClient::ChatClient(const std::string &server_ip, int port)
     : server_ip_(server_ip), port_(port), sock_(-1), connected_(false) {}
@@ -15,6 +37,15 @@ ChatClient::~ChatClient()
 
 void ChatClient::connect_to_server()
 {
+#ifdef _WIN32
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+    {
+        std::cerr << COLOR_RED << "WSAStartup failed" << COLOR_RESET << std::endl;
+        exit(1);
+    }
+#endif
+
     sock_ = socket(AF_INET, SOCK_STREAM, 0);
     if (sock_ < 0)
     {
@@ -30,7 +61,6 @@ void ChatClient::connect_to_server()
     {
         std::cerr << COLOR_RED << "Invalid address\n"
                   << COLOR_RESET;
-
         exit(1);
     }
 
@@ -48,7 +78,7 @@ void ChatClient::receive_messages()
     char buffer[1024];
     while (connected_)
     {
-        ssize_t bytes_received = recv(sock_, buffer, sizeof(buffer) - 1, 0);
+        int bytes_received = recv(sock_, buffer, sizeof(buffer) - 1, 0);
         if (bytes_received <= 0)
         {
             std::cout << "\nDisconnected from server.\n";
@@ -74,7 +104,7 @@ void ChatClient::send_messages()
     std::string username;
     std::cout << COLOR_BLUE << "Enter your username: " << COLOR_RESET;
     std::getline(std::cin, username);
-    send(sock_, username.c_str(), username.length(), 0);
+    send(sock_, username.c_str(), static_cast<int>(username.length()), 0);
 
     std::string message;
     std::cout << COLOR_CYAN << "> " << COLOR_RESET;
@@ -84,7 +114,7 @@ void ChatClient::send_messages()
             break;
 
         message += "\n";
-        send(sock_, message.c_str(), message.length(), 0);
+        send(sock_, message.c_str(), static_cast<int>(message.length()), 0);
 
         std::cout << COLOR_CYAN << "> " << COLOR_RESET;
     }
@@ -107,7 +137,10 @@ void ChatClient::cleanup()
 {
     if (sock_ != -1)
     {
-        close(sock_);
+        CLOSE_SOCKET(sock_);
         sock_ = -1;
     }
+#ifdef _WIN32
+    WSACleanup();
+#endif
 }
