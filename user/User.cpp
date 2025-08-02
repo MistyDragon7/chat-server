@@ -45,6 +45,11 @@ void User::rejectFriendRequestFrom(const std::string& other) {
     incomingRequests.erase(other);
 }
 
+void User::completeOutgoingFriendRequest(const std::string& other) {
+    outgoingRequests.erase(other);
+    friends.insert(other);
+}
+
 const std::unordered_set<std::string>& User::getFriends() const {
     return friends;
 }

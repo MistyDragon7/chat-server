@@ -146,10 +146,12 @@ bool UserManager::acceptFriendRequest(const std::string& username, const std::st
     if (!receiver.hasPendingRequestFrom(from)) return false;
 
     bool success1 = receiver.acceptFriendRequestFrom(from);
-    bool success2 = sender.acceptFriendRequestFrom(username);
+    if (success1) {
+        sender.completeOutgoingFriendRequest(username);
+    }
 
     saveToFile();
-    return success1 && success2;
+    return success1; // Return true only if receiver successfully accepted
 }
 
 void UserManager::storeMessage(const std::string& sender, const std::string& receiver, const std::string& content) {
