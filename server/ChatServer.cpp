@@ -237,6 +237,125 @@ void ChatServer::handle_client(int client_socket)
     CLOSE_SOCKET(client_socket);
 }
 
+// Helper function to handle chat commands (e.g., /friend, /msg)
+void ChatServer::process_chat_command(int client_socket, const std::string& sender_username, const std::string& message) {
+    if (message.rfind("/friend ", 0) == 0) { // Starts with "/friend "
+        std::string command_args = message.substr(8); // "add <username>" or "accept <username>" or "reject <username>"
+        size_t space_pos = command_args.find(' ');
+        if (space_pos == std::string::npos) {
+            std::string error_msg = COLOR_RED "[Server]: Invalid friend command format. Use /friend add <username>, /friend accept <username>, or /friend reject <username>." COLOR_RESET "\n";
+            send(client_socket, error_msg.c_str(), static_cast<int>(error_msg.length()), 0);
+            return;
+        }
+        std::string sub_command = command_args.substr(0, space_pos);
+        std::string target_username = command_args.substr(space_pos + 1);
+
+        if (sub_command == "add") {
+            if (user_manager_.sendFriendRequest(sender_username, target_username)) {
+                std::string success_msg = COLOR_GREEN "[Server]: Friend request sent to " + target_username + "." COLOR_RESET "\n";
+                send(client_socket, success_msg.c_str(), static_cast<int>(success_msg.length()), 0);
+                // Notify target user if online
+                for (auto const& [sock, uname] : clients_) {
+                    if (uname == target_username) {
+                        std::string notification = COLOR_YELLOW "[Server]: " + sender_username + " has sent you a friend request! Use /friend accept " + sender_username + " to accept." COLOR_RESET "\n";
+                        send(sock, notification.c_str(), static_cast<int>(notification.length()), 0);
+                        break;
+                    }
+                }
+            } else {
+                std::string error_msg = COLOR_RED "[Server]: Failed to send friend request to " + target_username + ". (User not found, already friends, or request pending)" COLOR_RESET "\n";
+                send(client_socket, error_msg.c_str(), static_cast<int>(error_msg.length()), 0);
+            }
+        } else if (sub_command == "accept") {
+            if (user_manager_.acceptFriendRequest(sender_username, target_username)) {
+                std::string success_msg = COLOR_GREEN "[Server]: You are now friends with " + target_username + "." COLOR_RESET "\n";
+                send(client_socket, success_msg.c_str(), static_cast<int>(success_msg.length()), 0);
+                // Notify target user if online
+                for (auto const& [sock, uname] : clients_) {
+                    if (uname == target_username) {
+                        std::string notification = COLOR_GREEN "[Server]: " + sender_username + " has accepted your friend request!" COLOR_RESET "\n";
+                        send(sock, notification.c_str(), static_cast<int>(notification.length()), 0);
+                        break;
+                    }
+                }
+            } else {
+                std::string error_msg = COLOR_RED "[Server]: Failed to accept friend request from " + target_username + ". (No pending request or user not found)" COLOR_RESET "\n";
+                send(client_socket, error_msg.c_str(), static_cast<int>(error_msg.length()), 0);
+            }
+        } else if (sub_command == "reject") {
+            // Implement reject logic if needed in UserManager
+            // For now, simply remove incoming request if it exists
+            std::optional<std::reference_wrapper<User>> user_opt = user_manager_.getUser(sender_username);
+            if (user_opt) {
+                user_opt->get().rejectFriendRequestFrom(target_username);
+                user_manager_.saveToFile(); // Save changes
+                std::string success_msg = COLOR_GREEN "[Server]: Friend request from " + target_username + " rejected." COLOR_RESET "\n";
+                send(client_socket, success_msg.c_str(), static_cast<int>(success_msg.length()), 0);
+            } else {
+                std::string error_msg = COLOR_RED "[Server]: Failed to reject friend request from " + target_username + ". (User not found or no pending request)" COLOR_RESET "\n";
+                send(client_socket, error_msg.c_str(), static_cast<int>(error_msg.length()), 0);
+            }
+        } else {
+            std::string error_msg = COLOR_RED "[Server]: Unknown friend command: " + sub_command + ". Use add, accept, or reject." COLOR_RESET "\n";
+            send(client_socket, error_msg.c_str(), static_cast<int>(error_msg.length()), 0);
+        }
+    } else if (message.rfind("/msg ", 0) == 0) { // Starts with "/msg "
+        std::string command_args = message.substr(5); // "<username> <message>"
+        size_t first_space = command_args.find(' ');
+        if (first_space == std::string::npos) {
+            std::string error_msg = COLOR_RED "[Server]: Invalid message format. Use /msg <username> <message>." COLOR_RESET "\n";
+            send(client_socket, error_msg.c_str(), static_cast<int>(error_msg.length()), 0);
+            return;
+        }
+        std::string recipient_username = command_args.substr(0, first_space);
+        std::string dm_content = command_args.substr(first_space + 1);
+
+        std::optional<std::reference_wrapper<User>> sender_user_opt = user_manager_.getUser(sender_username);
+        std::optional<std::reference_wrapper<User>> recipient_user_opt = user_manager_.getUser(recipient_username);
+
+        if (!sender_user_opt || !recipient_user_opt) {
+            std::string error_msg = COLOR_RED "[Server]: User not found." COLOR_RESET "\n";
+            send(client_socket, error_msg.c_str(), static_cast<int>(error_msg.length()), 0);
+            return;
+        }
+
+        User& sender_user = sender_user_opt->get();
+        User& recipient_user = recipient_user_opt->get();
+
+        if (!sender_user.hasFriend(recipient_username)) {
+            std::string error_msg = COLOR_RED "[Server]: You are not friends with " + recipient_username + "." COLOR_RESET "\n";
+            send(client_socket, error_msg.c_str(), static_cast<int>(error_msg.length()), 0);
+            return;
+        }
+
+        user_manager_.storeMessage(sender_username, recipient_username, dm_content);
+        std::string formatted_dm = COLOR_MAGENTA "[DM from " + sender_username + "]: " + dm_content + COLOR_RESET + "\n";
+
+        // Send DM to recipient if online
+        bool recipient_online = false;
+        for (auto const& [sock, uname] : clients_) {
+            if (uname == recipient_username) {
+                send(sock, formatted_dm.c_str(), static_cast<int>(formatted_dm.length()), 0);
+                recipient_online = true;
+                break;
+            }
+        }
+
+        if (recipient_online) {
+            std::string success_msg = COLOR_GREEN "[Server]: Message sent to " + recipient_username + "." COLOR_RESET "\n";
+            send(client_socket, success_msg.c_str(), static_cast<int>(success_msg.length()), 0);
+        } else {
+            std::string info_msg = COLOR_YELLOW "[Server]: " + recipient_username + " is offline. Message stored." COLOR_RESET "\n";
+            send(client_socket, info_msg.c_str(), static_cast<int>(info_msg.length()), 0);
+        }
+
+    } else { // Not a recognized command, treat as public chat
+        std::string formatted = "[" + sender_username + "]: " + message + "\n";
+        std::cout << formatted;
+        broadcast(formatted, client_socket);
+    }
+}
+
 void ChatServer::broadcast(const std::string &message, int sender_socket)
 {
     std::lock_guard<std::mutex> lock(clients_mutex_);

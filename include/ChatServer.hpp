@@ -35,6 +35,9 @@ private:
     void broadcast(const std::string &message, int sender_socket);
     void remove_client(int socket);
 
+    // Helper function to handle chat commands (e.g., /friend, /msg)
+    void process_chat_command(int client_socket, const std::string& sender_username, const std::string& message);
+
     int port_;
     int server_fd_;
     std::map<int, std::string> clients_; // Change clients_ to map socket to username

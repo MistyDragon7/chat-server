@@ -12,10 +12,11 @@ private:
     std::string dataFile;
 
     void loadFromFile();
-    void saveToFile() const;
+    // void saveToFile() const; // Moved to public section
 
 public:
     explicit UserManager(const std::string& filename = "users.json");
+    void saveToFile() const; // Made public for external use
 
     bool userExists(const std::string& username) const;
     bool registerUser(const std::string& username, const std::string& password);

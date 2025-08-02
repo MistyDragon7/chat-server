@@ -28,7 +28,7 @@ User(const std::string& username, const std::string& password);
     void sendFriendRequestTo(const std::string& other);
     void receiveFriendRequestFrom(const std::string& other);
     bool acceptFriendRequestFrom(const std::string& other);
-    void rejectFriendRequestFrom(const std::string& other);
+    void rejectFriendRequestFrom(const std::string& other); // Make public for UserManager direct use
 
     // Friends and messaging
     const std::unordered_set<std::string>& getFriends() const;

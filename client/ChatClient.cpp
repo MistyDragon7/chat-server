@@ -118,8 +118,16 @@ void ChatClient::send_messages()
         if (message == "/quit" || std::cin.eof())
             break;
 
-        message += "\n";
-        send(sock_, message.c_str(), static_cast<int>(message.length()), 0);
+        // Check if the message is a command
+        if (message.rfind("/", 0) == 0) {
+            // It's a command, send as is (with a newline)
+            message += "\n";
+            send(sock_, message.c_str(), static_cast<int>(message.length()), 0);
+        } else {
+            // It's a regular chat message
+            message += "\n";
+            send(sock_, message.c_str(), static_cast<int>(message.length()), 0);
+        }
 
         std::cout << COLOR_CYAN << "> " << COLOR_RESET;
     }
