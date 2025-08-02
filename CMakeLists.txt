@@ -8,6 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 add_executable(chat_server
     server/ChatServer.cpp
     server/main.cpp
+    user/User.cpp
+    user/UserManager.cpp
 )
 
 target_include_directories(chat_server PRIVATE include)

@@ -27,8 +27,8 @@
 #define CLOSE_SOCKET close
 #endif
 
-ChatClient::ChatClient(const std::string &server_ip, int port)
-    : server_ip_(server_ip), port_(port), sock_(-1), connected_(false) {}
+ChatClient::ChatClient(const std::string &server_ip, int port, const std::string &username, const std::string &password)
+    : server_ip_(server_ip), port_(port), sock_(-1), username_(username), password_(password), connected_(false) {}
 
 ChatClient::~ChatClient()
 {
@@ -101,10 +101,12 @@ void ChatClient::receive_messages()
 
 void ChatClient::send_messages()
 {
-    std::string username;
-    std::cout << COLOR_BLUE << "Enter your username: " << COLOR_RESET;
-    std::getline(std::cin, username);
-    send(sock_, username.c_str(), static_cast<int>(username.length()), 0);
+    // Send username and password to server, each terminated by a newline
+    std::string username_with_newline = username_ + "\n";
+    send(sock_, username_with_newline.c_str(), static_cast<int>(username_with_newline.length()), 0);
+
+    std::string password_with_newline = password_ + "\n";
+    send(sock_, password_with_newline.c_str(), static_cast<int>(password_with_newline.length()), 0);
 
     std::string message;
     std::cout << COLOR_CYAN << "> " << COLOR_RESET;

@@ -28,7 +28,7 @@ void UserManager::loadFromFile() {
                 user.storeMessage(friendName, sender, content);
             }
         }
-        users[username] = user;
+        users.emplace(username, user); // Use emplace instead of operator[]
     }
 }
 
@@ -88,8 +88,8 @@ std::optional<std::reference_wrapper<const User>> UserManager::getUser(const std
 bool UserManager::sendFriendRequest(const std::string& from, const std::string& to) {
     if (!userExists(from) || !userExists(to) || from == to) return false;
 
-    User& sender = users[from];
-    User& receiver = users[to];
+    User& sender = users.at(from); // Use .at() instead of operator[]
+    User& receiver = users.at(to);   // Use .at() instead of operator[]
 
     if (sender.hasSentRequestTo(to) || receiver.hasPendingRequestFrom(from)) return false;
 
@@ -102,8 +102,8 @@ bool UserManager::sendFriendRequest(const std::string& from, const std::string& 
 bool UserManager::acceptFriendRequest(const std::string& username, const std::string& from) {
     if (!userExists(username) || !userExists(from)) return false;
 
-    User& receiver = users[username];
-    User& sender = users[from];
+    User& receiver = users.at(username); // Use .at() instead of operator[]
+    User& sender = users.at(from);       // Use .at() instead of operator[]
 
     if (!receiver.hasPendingRequestFrom(from)) return false;
 
@@ -117,7 +117,7 @@ bool UserManager::acceptFriendRequest(const std::string& username, const std::st
 void UserManager::storeMessage(const std::string& sender, const std::string& receiver, const std::string& content) {
     if (!userExists(sender) || !userExists(receiver)) return;
 
-    users[sender].storeMessage(receiver, sender, content);
-    users[receiver].storeMessage(sender, sender, content);
+    users.at(sender).storeMessage(receiver, sender, content); // Use .at() instead of operator[]
+    users.at(receiver).storeMessage(sender, sender, content); // Use .at() instead of operator[]
     saveToFile();
 }

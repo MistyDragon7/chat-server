@@ -17,9 +17,10 @@ typedef int socklen_t;
 #endif
 
 #include <string>
-#include <vector>
-#include <thread>
 #include <mutex>
+#include <map> // For std::map
+
+#include "user/UserManager.hpp" // Include UserManager
 
 class ChatServer
 {
@@ -36,9 +37,10 @@ private:
 
     int port_;
     int server_fd_;
-    std::vector<std::pair<std::string, int>> clients_;
+    std::map<int, std::string> clients_; // Change clients_ to map socket to username
     std::mutex clients_mutex_;
     bool running_ = false;
+    UserManager user_manager_;
 };
 
 #endif // CHAT_SERVER_HPP

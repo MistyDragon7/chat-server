@@ -3,9 +3,9 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
-#include <vector>
 #include <string>
 #include <cstring>
+#include <map>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -24,7 +24,12 @@
 #define CLOSE_SOCKET close
 #endif
 
-ChatServer::ChatServer(int port) : port_(port), server_fd_(-1) {}
+#include "../include/user/UserManager.hpp"
+#include "../include/Color.hpp"
+
+// UserManager user_manager("users.json"); // Removed global UserManager
+
+ChatServer::ChatServer(int port) : port_(port), server_fd_(-1), user_manager_("users.json") {}
 
 ChatServer::~ChatServer()
 {
@@ -102,30 +107,74 @@ void ChatServer::accept_clients()
 
 void ChatServer::handle_client(int client_socket)
 {
-    char name_buffer[100] = {0};
-    int name_len = recv(client_socket, name_buffer, sizeof(name_buffer) - 1, 0);
-    if (name_len <= 0)
-    {
+    char buffer[1024];
+    std::string received_data;
+    // Read initial data for username and password
+    int bytes_received = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
+    if (bytes_received <= 0) {
         CLOSE_SOCKET(client_socket);
         return;
     }
+    buffer[bytes_received] = '\0';
+    received_data += buffer;
 
-    std::string username(name_buffer);
-    {
-        std::lock_guard<std::mutex> lock(clients_mutex_);
-        clients_.emplace_back(username, client_socket);
+    size_t username_end = received_data.find('\n');
+    if (username_end == std::string::npos) {
+        // Error: username not terminated by newline, or incomplete data
+        CLOSE_SOCKET(client_socket);
+        return;
+    }
+    std::string username = received_data.substr(0, username_end);
+    received_data.erase(0, username_end + 1);
+
+    size_t password_end = received_data.find('\n');
+    if (password_end == std::string::npos) {
+        // Error: password not terminated by newline, or incomplete data
+        CLOSE_SOCKET(client_socket);
+        return;
+    }
+    std::string password = received_data.substr(0, password_end);
+    received_data.erase(0, password_end + 1);
+
+    // Check if user exists, if not, try to register
+    if (!user_manager_.userExists(username)) {
+        if (user_manager_.registerUser(username, password)) {
+            std::cout << "New user " << username << " registered successfully." << std::endl;
+        } else {
+            std::string reg_failed_msg = COLOR_RED "[Server]: Registration failed for user: " + username + ". Please try again." COLOR_RESET "\n";
+            send(client_socket, reg_failed_msg.c_str(), static_cast<int>(reg_failed_msg.length()), 0);
+            CLOSE_SOCKET(client_socket);
+            std::cerr << "Registration failed for user: " << username << std::endl;
+            return;
+        }
     }
 
-    std::string welcome = "[Server]: " + username + " has joined the chat!\n";
+    // Authenticate user
+    if (!user_manager_.authenticateUser(username, password)) {
+        std::string auth_failed_msg = COLOR_RED "[Server]: Authentication failed. Invalid username or password." COLOR_RESET "\n";
+        send(client_socket, auth_failed_msg.c_str(), static_cast<int>(auth_failed_msg.length()), 0);
+        CLOSE_SOCKET(client_socket);
+        std::cerr << "Authentication failed for user: " << username << std::endl;
+        return;
+    }
+
+    std::cout << "User " << username << " authenticated successfully." << std::endl;
+
+    {
+        std::lock_guard<std::mutex> lock(clients_mutex_);
+        clients_[client_socket] = username; // Store client with socket as key and username as value
+    }
+
+    std::string welcome = COLOR_GREEN "[Server]: " + username + " has joined the chat!" COLOR_RESET "\n";
     broadcast(welcome, client_socket);
     std::cout << welcome;
 
-    char buffer[1024];
-    std::string leftover;
+    // Use the remaining data as leftover for chat messages
+    std::string leftover = received_data;
 
     while (true)
     {
-        int bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+        bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
         if (bytes_received <= 0)
         {
             break;
@@ -146,16 +195,12 @@ void ChatServer::handle_client(int client_socket)
     }
     remove_client(client_socket);
     CLOSE_SOCKET(client_socket);
-
-    std::string goodbye = "[Server]: " + username + " has left the chat.\n";
-    broadcast(goodbye, -1);
-    std::cout << goodbye;
 }
 
 void ChatServer::broadcast(const std::string &message, int sender_socket)
 {
     std::lock_guard<std::mutex> lock(clients_mutex_);
-    for (auto &[name, client_socket] : clients_)
+    for (auto const& [client_socket, username] : clients_)
     {
         if (client_socket != sender_socket)
         {
@@ -167,13 +212,13 @@ void ChatServer::broadcast(const std::string &message, int sender_socket)
 void ChatServer::remove_client(int socket)
 {
     std::lock_guard<std::mutex> lock(clients_mutex_);
-    for (auto it = clients_.begin(); it != clients_.end(); ++it)
-    {
-        if (it->second == socket)
-        {
-            std::cout << it->first << " has disconnected." << std::endl;
-            clients_.erase(it);
-            break;
-        }
+    auto it = clients_.find(socket);
+    if (it != clients_.end()) {
+        std::string username = it->second;
+        std::cout << username << " has disconnected." << std::endl;
+        clients_.erase(it);
+
+        std::string goodbye = COLOR_YELLOW "[Server]: " + username + " has left the chat." COLOR_RESET "\n";
+        broadcast(goodbye, -1); // Broadcast to all remaining clients
     }
 }
