@@ -7,7 +7,7 @@
 class ChatClient
 {
 public:
-    ChatClient(const std::string &server_ip, int port);
+    ChatClient(const std::string &server_ip, int port, const std::string &username, const std::string &password);
     ~ChatClient();
 
     void run();
@@ -21,6 +21,8 @@ private:
     std::string server_ip_;
     int port_;
     int sock_;
+    std::string username_;
+    std::string password_;
     std::thread receiver_thread_;
     bool connected_;
 };
