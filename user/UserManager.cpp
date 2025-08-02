@@ -1,6 +1,7 @@
 #include "../include/user/UserManager.hpp"
 #include <fstream>
 #include "../include/nlohmann/json.hpp"
+#include <iostream> // For std::cerr
 
 using json = nlohmann::json;
 
@@ -12,8 +13,18 @@ void UserManager::loadFromFile() {
     std::ifstream inFile(dataFile);
     if (!inFile.is_open()) return;
 
+    // Check if the file is empty
+    if (inFile.peek() == EOF) {
+        return; // Empty file, nothing to load
+    }
+
     json j;
-    inFile >> j;
+    try {
+        inFile >> j;
+    } catch (const json::parse_error& e) {
+        std::cerr << "JSON parse error in " << dataFile << ": " << e.what() << std::endl;
+        return;
+    }
     for (const auto& [username, data] : j.items()) {
         User user(username, "");  // Password will be set directly from hash
         user.passwordHash = data["passwordHash"].get<std::string>();
