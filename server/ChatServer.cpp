@@ -108,73 +108,40 @@ void ChatServer::accept_clients()
 
 void ChatServer::handle_client(int client_socket)
 {
-    char buffer[1024];
-    std::string received_data;
+    std::string received_data_leftover; // This will hold any remaining data after initial reads
 
     // First, receive and validate the handshake magic string
-    int bytes_received = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
-    if (bytes_received <= 0) {
+    std::optional<std::string> handshake_opt = read_delimited_message(client_socket, received_data_leftover);
+    if (!handshake_opt) {
         CLOSE_SOCKET(client_socket);
         std::cerr << "Client disconnected during handshake or sent no data." << std::endl;
         return;
     }
-    buffer[bytes_received] = '\0';
-    std::string handshake_received(buffer);
-
-    // Strip carriage return and newline from handshake
-    if (!handshake_received.empty() && handshake_received.back() == '\r') {
-        handshake_received.pop_back();
-    }
-    if (!handshake_received.empty() && handshake_received.back() == '\n') {
-        handshake_received.pop_back();
-    }
+    std::string handshake_received = *handshake_opt;
 
     if (handshake_received != CLIENT_HANDSHAKE_MAGIC.substr(0, CLIENT_HANDSHAKE_MAGIC.length() -1)) { // Compare without newline
-        std::cerr << COLOR_RED << "Invalid handshake from client: " << handshake_received << COLOR_RESET << std::endl;
+        std::cerr << COLOR_RED << "Invalid handshake from client: '" << handshake_received << "'" << COLOR_RESET << std::endl;
         CLOSE_SOCKET(client_socket);
         return;
     }
 
-    // Read username and password
-    bytes_received = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
-    if (bytes_received <= 0) {
+    // Read username
+    std::optional<std::string> username_opt = read_delimited_message(client_socket, received_data_leftover);
+    if (!username_opt) {
         CLOSE_SOCKET(client_socket);
+        std::cerr << "Client disconnected during username reception or sent no data." << std::endl;
         return;
     }
-    buffer[bytes_received] = '\0';
-    received_data += buffer;
+    std::string username = *username_opt;
 
-    size_t username_end = received_data.find('\n');
-    if (username_end == std::string::npos) {
-        // Error: username not terminated by newline, or incomplete data
+    // Read password
+    std::optional<std::string> password_opt = read_delimited_message(client_socket, received_data_leftover);
+    if (!password_opt) {
         CLOSE_SOCKET(client_socket);
+        std::cerr << "Client disconnected during password reception or sent no data." << std::endl;
         return;
     }
-    std::string username = received_data.substr(0, username_end);
-    // Strip carriage return and newline from username
-    if (!username.empty() && username.back() == '\r') {
-        username.pop_back();
-    }
-    if (!username.empty() && username.back() == '\n') {
-        username.pop_back();
-    }
-    received_data.erase(0, username_end + 1);
-
-    size_t password_end = received_data.find('\n');
-    if (password_end == std::string::npos) {
-        // Error: password not terminated by newline, or incomplete data
-        CLOSE_SOCKET(client_socket);
-        return;
-    }
-    std::string password = received_data.substr(0, password_end);
-    // Strip carriage return and newline from password
-    if (!password.empty() && password.back() == '\r') {
-        password.pop_back();
-    }
-    if (!password.empty() && password.back() == '\n') {
-        password.pop_back();
-    }
-    received_data.erase(0, password_end + 1);
+    std::string password = *password_opt;
 
     // Check if user exists, if not, try to register
     if (!user_manager_.userExists(username)) {
@@ -209,25 +176,23 @@ void ChatServer::handle_client(int client_socket)
     broadcast(welcome, client_socket);
     std::cout << welcome;
 
-    // Use the remaining data as leftover for chat messages
-    std::string leftover = received_data;
+    // The remaining data in received_data_leftover will be processed by the chat loop
+    std::string leftover = received_data_leftover;
 
     while (true)
     {
-        bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
-        if (bytes_received <= 0)
-        {
+        // This part needs to also use read_delimited_message for robustness
+        std::optional<std::string> msg_opt = read_delimited_message(client_socket, leftover);
+        if (!msg_opt) {
+            // Client disconnected or error, break from chat loop
             break;
         }
-        buffer[bytes_received] = '\0';
-        leftover += buffer;
+        std::string msg = *msg_opt;
 
-        size_t pos;
-        while ((pos = leftover.find('\n')) != std::string::npos)
-        {
-            std::string msg = leftover.substr(0, pos);
-            leftover.erase(0, pos + 1);
-
+        // Check if the message is a command or a public chat message
+        if (msg.rfind("/", 0) == 0) {
+            process_chat_command(client_socket, username, msg);
+        } else {
             std::string formatted = "[" + username + "]: " + msg + "\n";
             std::cout << formatted;
             broadcast(formatted, client_socket);
@@ -235,6 +200,31 @@ void ChatServer::handle_client(int client_socket)
     }
     remove_client(client_socket);
     CLOSE_SOCKET(client_socket);
+}
+
+// Helper function to read a newline-delimited message
+std::optional<std::string> ChatServer::read_delimited_message(int client_socket, std::string& leftover_buffer) {
+    char temp_buffer[1024];
+    while (true) {
+        size_t newline_pos = leftover_buffer.find('\n');
+        if (newline_pos != std::string::npos) {
+            std::string message = leftover_buffer.substr(0, newline_pos);
+            leftover_buffer.erase(0, newline_pos + 1);
+            // Strip carriage return if present
+            if (!message.empty() && message.back() == '\r') {
+                message.pop_back();
+            }
+            return message;
+        }
+
+        int bytes_received = recv(client_socket, temp_buffer, sizeof(temp_buffer) - 1, 0);
+        if (bytes_received <= 0) {
+            // Client disconnected or error
+            return std::nullopt;
+        }
+        temp_buffer[bytes_received] = '\0';
+        leftover_buffer += temp_buffer;
+    }
 }
 
 // Helper function to handle chat commands (e.g., /friend, /msg)
@@ -283,8 +273,6 @@ void ChatServer::process_chat_command(int client_socket, const std::string& send
                 send(client_socket, error_msg.c_str(), static_cast<int>(error_msg.length()), 0);
             }
         } else if (sub_command == "reject") {
-            // Implement reject logic if needed in UserManager
-            // For now, simply remove incoming request if it exists
             std::optional<std::reference_wrapper<User>> user_opt = user_manager_.getUser(sender_username);
             if (user_opt) {
                 user_opt->get().rejectFriendRequestFrom(target_username);

@@ -19,6 +19,7 @@ typedef int socklen_t;
 #include <string>
 #include <mutex>
 #include <map> // For std::map
+#include <optional> // For std::optional
 
 #include "user/UserManager.hpp" // Include UserManager
 
@@ -30,13 +31,16 @@ public:
     void start();
 
 private:
+    // Helper function to read a newline-delimited message
+    std::optional<std::string> read_delimited_message(int client_socket, std::string& leftover_buffer);
+
+    // Helper function to handle chat commands (e.g., /friend, /msg)
+    void process_chat_command(int client_socket, const std::string& sender_username, const std::string& message);
+
     void accept_clients();
     void handle_client(int client_socket);
     void broadcast(const std::string &message, int sender_socket);
     void remove_client(int socket);
-
-    // Helper function to handle chat commands (e.g., /friend, /msg)
-    void process_chat_command(int client_socket, const std::string& sender_username, const std::string& message);
 
     int port_;
     int server_fd_;
