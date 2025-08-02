@@ -26,6 +26,7 @@
 
 #include "../include/user/UserManager.hpp"
 #include "../include/Color.hpp"
+#include "../include/Common.hpp" // Include Common.hpp
 
 // UserManager user_manager("users.json"); // Removed global UserManager
 
@@ -109,8 +110,33 @@ void ChatServer::handle_client(int client_socket)
 {
     char buffer[1024];
     std::string received_data;
-    // Read initial data for username and password
+
+    // First, receive and validate the handshake magic string
     int bytes_received = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
+    if (bytes_received <= 0) {
+        CLOSE_SOCKET(client_socket);
+        std::cerr << "Client disconnected during handshake or sent no data." << std::endl;
+        return;
+    }
+    buffer[bytes_received] = '\0';
+    std::string handshake_received(buffer);
+
+    // Strip carriage return and newline from handshake
+    if (!handshake_received.empty() && handshake_received.back() == '\r') {
+        handshake_received.pop_back();
+    }
+    if (!handshake_received.empty() && handshake_received.back() == '\n') {
+        handshake_received.pop_back();
+    }
+
+    if (handshake_received != CLIENT_HANDSHAKE_MAGIC.substr(0, CLIENT_HANDSHAKE_MAGIC.length() -1)) { // Compare without newline
+        std::cerr << COLOR_RED << "Invalid handshake from client: " << handshake_received << COLOR_RESET << std::endl;
+        CLOSE_SOCKET(client_socket);
+        return;
+    }
+
+    // Read username and password
+    bytes_received = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
     if (bytes_received <= 0) {
         CLOSE_SOCKET(client_socket);
         return;
@@ -125,6 +151,13 @@ void ChatServer::handle_client(int client_socket)
         return;
     }
     std::string username = received_data.substr(0, username_end);
+    // Strip carriage return and newline from username
+    if (!username.empty() && username.back() == '\r') {
+        username.pop_back();
+    }
+    if (!username.empty() && username.back() == '\n') {
+        username.pop_back();
+    }
     received_data.erase(0, username_end + 1);
 
     size_t password_end = received_data.find('\n');
@@ -134,6 +167,13 @@ void ChatServer::handle_client(int client_socket)
         return;
     }
     std::string password = received_data.substr(0, password_end);
+    // Strip carriage return and newline from password
+    if (!password.empty() && password.back() == '\r') {
+        password.pop_back();
+    }
+    if (!password.empty() && password.back() == '\n') {
+        password.pop_back();
+    }
     received_data.erase(0, password_end + 1);
 
     // Check if user exists, if not, try to register
