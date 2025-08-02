@@ -3,6 +3,7 @@
 #include <iostream>
 #include <thread>
 #include <string>
+#include "../include/Common.hpp" // Include Common.hpp
 // #include <cstring>
 
 #ifdef _WIN32
@@ -71,6 +72,15 @@ void ChatClient::connect_to_server()
     }
 
     connected_ = true;
+    // Send handshake magic string immediately after connecting
+    send(sock_, CLIENT_HANDSHAKE_MAGIC.c_str(), static_cast<int>(CLIENT_HANDSHAKE_MAGIC.length()), 0);
+
+    // Send username and password to server, each terminated by a newline
+    std::string username_with_newline = username_ + "\n";
+    send(sock_, username_with_newline.c_str(), static_cast<int>(username_with_newline.length()), 0);
+
+    std::string password_with_newline = password_ + "\n";
+    send(sock_, password_with_newline.c_str(), static_cast<int>(password_with_newline.length()), 0);
 }
 
 void ChatClient::receive_messages()
@@ -101,13 +111,6 @@ void ChatClient::receive_messages()
 
 void ChatClient::send_messages()
 {
-    // Send username and password to server, each terminated by a newline
-    std::string username_with_newline = username_ + "\n";
-    send(sock_, username_with_newline.c_str(), static_cast<int>(username_with_newline.length()), 0);
-
-    std::string password_with_newline = password_ + "\n";
-    send(sock_, password_with_newline.c_str(), static_cast<int>(password_with_newline.length()), 0);
-
     std::string message;
     std::cout << COLOR_CYAN << "> " << COLOR_RESET;
     while (std::getline(std::cin, message))
