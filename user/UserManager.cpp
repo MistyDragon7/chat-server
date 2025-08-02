@@ -13,14 +13,18 @@ void UserManager::loadFromFile() {
     std::ifstream inFile(dataFile);
     if (!inFile.is_open()) return;
 
-    // Check if the file is empty
-    if (inFile.peek() == EOF) {
-        return; // Empty file, nothing to load
+    std::string content((std::istreambuf_iterator<char>(inFile)),
+                        std::istreambuf_iterator<char>());
+    inFile.close(); // Close the file stream after reading content
+
+    if (content.empty()) {
+        // File is empty, nothing to load
+        return;
     }
 
     json j;
     try {
-        inFile >> j;
+        j = json::parse(content);
     } catch (const json::parse_error& e) {
         std::cerr << "JSON parse error in " << dataFile << ": " << e.what() << std::endl;
         return;
