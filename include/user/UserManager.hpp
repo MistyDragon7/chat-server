@@ -27,6 +27,11 @@ public:
 
     bool sendFriendRequest(const std::string& from, const std::string& to);
     bool acceptFriendRequest(const std::string& username, const std::string& from);
+    // New function to handle rejection from both sides
+    bool rejectFriendRequest(const std::string& rejecting_username, const std::string& sender_username);
+
+    // New function to get pending incoming friend requests
+    std::optional<std::reference_wrapper<const std::unordered_set<std::string>>> getIncomingFriendRequests(const std::string& username) const;
 
     void storeMessage(const std::string& sender, const std::string& receiver, const std::string& content);
 };

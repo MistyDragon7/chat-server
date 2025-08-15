@@ -28,11 +28,14 @@ User(const std::string& username, const std::string& password);
     void sendFriendRequestTo(const std::string& other);
     void receiveFriendRequestFrom(const std::string& other);
     bool acceptFriendRequestFrom(const std::string& other);
-    void rejectFriendRequestFrom(const std::string& other); // Make public for UserManager direct use
+    // Modify signature to take sender's username
+    void rejectFriendRequestFrom(const std::string& sender_username);
     void completeOutgoingFriendRequest(const std::string& other); // New method
+    void cancelOutgoingFriendRequest(const std::string& other); // New method to cancel an outgoing request
 
     // Friends and messaging
     const std::unordered_set<std::string>& getFriends() const;
+    const std::unordered_set<std::string>& getIncomingFriendRequests() const;
     void storeMessage(const std::string& chatPartner, const std::string& sender, const std::string& content);
     const std::vector<Message>& getChatHistoryWith(const std::string& friendUsername) const;
 

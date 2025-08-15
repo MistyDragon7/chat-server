@@ -41,8 +41,10 @@ bool User::acceptFriendRequestFrom(const std::string& other) {
     return false;
 }
 
-void User::rejectFriendRequestFrom(const std::string& other) {
-    incomingRequests.erase(other);
+void User::rejectFriendRequestFrom(const std::string& sender_username) {
+    incomingRequests.erase(sender_username);
+    // Also remove from the sender's outgoing requests if this method is called directly by UserManager
+    // This part will be handled in UserManager, which has access to both users
 }
 
 void User::completeOutgoingFriendRequest(const std::string& other) {
@@ -50,8 +52,16 @@ void User::completeOutgoingFriendRequest(const std::string& other) {
     friends.insert(other);
 }
 
+void User::cancelOutgoingFriendRequest(const std::string& other) {
+    outgoingRequests.erase(other);
+}
+
 const std::unordered_set<std::string>& User::getFriends() const {
     return friends;
+}
+
+const std::unordered_set<std::string>& User::getIncomingFriendRequests() const {
+    return incomingRequests;
 }
 
 void User::storeMessage(const std::string& chatPartner, const std::string& sender, const std::string& content) {

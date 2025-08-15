@@ -154,6 +154,28 @@ bool UserManager::acceptFriendRequest(const std::string& username, const std::st
     return success1; // Return true only if receiver successfully accepted
 }
 
+bool UserManager::rejectFriendRequest(const std::string& rejecting_username, const std::string& sender_username) {
+    if (!userExists(rejecting_username) || !userExists(sender_username)) return false;
+
+    User& rejector = users.at(rejecting_username);
+    User& sender = users.at(sender_username);
+
+    if (!rejector.hasPendingRequestFrom(sender_username)) return false; // No pending request to reject
+
+    rejector.rejectFriendRequestFrom(sender_username);
+    sender.cancelOutgoingFriendRequest(rejecting_username);
+    saveToFile();
+    return true;
+}
+
+std::optional<std::reference_wrapper<const std::unordered_set<std::string>>> UserManager::getIncomingFriendRequests(const std::string& username) const {
+    auto it = users.find(username);
+    if (it == users.end()) {
+        return std::nullopt;
+    }
+    return it->second.getIncomingFriendRequests();
+}
+
 void UserManager::storeMessage(const std::string& sender, const std::string& receiver, const std::string& content) {
     if (!userExists(sender) || !userExists(receiver)) return;
 

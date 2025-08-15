@@ -209,6 +209,9 @@ void ChatServer::handle_client(int client_socket)
             broadcast(formatted, client_socket);
         }
     }
+    // Client disconnected or error, broadcast departure and clean up
+    std::string goodbye_message = COLOR_YELLOW "[Server]: " + username + " has left the chat." COLOR_RESET "\n";
+    broadcast(goodbye_message, client_socket); // Broadcast before removing client
     remove_client(client_socket);
     CLOSE_SOCKET(client_socket);
 }
@@ -284,14 +287,12 @@ void ChatServer::process_chat_command(int client_socket, const std::string& send
                 send(client_socket, error_msg.c_str(), static_cast<int>(error_msg.length()), 0);
             }
         } else if (sub_command == "reject") {
-            std::optional<std::reference_wrapper<User>> user_opt = user_manager_.getUser(sender_username);
-            if (user_opt) {
-                user_opt->get().rejectFriendRequestFrom(target_username);
-                user_manager_.saveToFile(); // Save changes
+            // Use the new UserManager function to handle rejection from both sides
+            if (user_manager_.rejectFriendRequest(sender_username, target_username)) {
                 std::string success_msg = COLOR_GREEN "[Server]: Friend request from " + target_username + " rejected." COLOR_RESET "\n";
                 send(client_socket, success_msg.c_str(), static_cast<int>(success_msg.length()), 0);
             } else {
-                std::string error_msg = COLOR_RED "[Server]: Failed to reject friend request from " + target_username + ". (User not found or no pending request)" COLOR_RESET "\n";
+                std::string error_msg = COLOR_RED "[Server]: Failed to reject friend request from " + target_username + ". (No pending request or user not found)" COLOR_RESET "\n";
                 send(client_socket, error_msg.c_str(), static_cast<int>(error_msg.length()), 0);
             }
         } else {
@@ -360,6 +361,19 @@ void ChatServer::process_chat_command(int client_socket, const std::string& send
         CLOSE_SOCKET(client_socket);
         return; // Exit thread for this client
 
+    } else if (message == "/pending") {
+        std::optional<std::reference_wrapper<const std::unordered_set<std::string>>> pending_requests_opt = user_manager_.getIncomingFriendRequests(sender_username);
+        if (pending_requests_opt && !pending_requests_opt->get().empty()) {
+            std::string response = COLOR_CYAN "[Server]: Pending friend requests:\n" COLOR_RESET;
+            for (const std::string& req_sender : pending_requests_opt->get()) {
+                response += COLOR_CYAN "- " + req_sender + "\n" COLOR_RESET;
+            }
+            send(client_socket, response.c_str(), static_cast<int>(response.length()), 0);
+        } else {
+            std::string no_requests_msg = COLOR_CYAN "[Server]: No pending friend requests." COLOR_RESET "\n";
+            send(client_socket, no_requests_msg.c_str(), static_cast<int>(no_requests_msg.length()), 0);
+        }
+
     } else { // Not a recognized command, treat as public chat
         std::string formatted = "[" + sender_username + "]: " + message + "\n";
         std::cout << formatted;
@@ -388,7 +402,8 @@ void ChatServer::remove_client(int socket)
         std::cout << username << " has disconnected." << std::endl;
         clients_.erase(it);
 
-        std::string goodbye = COLOR_YELLOW "[Server]: " + username + " has left the chat." COLOR_RESET "\n";
-        broadcast(goodbye, -1); // Broadcast to all remaining clients
+        // The broadcast for client departure will now be handled by handle_client before calling remove_client
+        // std::string goodbye = COLOR_YELLOW "[Server]: " + username + " has left the chat." COLOR_RESET "\n";
+        // broadcast(goodbye, -1); // Broadcast to all remaining clients
     }
 }
