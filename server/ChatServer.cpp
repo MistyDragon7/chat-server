@@ -6,6 +6,7 @@
 #include <string>
 #include <cstring>
 #include <map>
+#include <optional>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -113,6 +114,8 @@ void ChatServer::handle_client(int client_socket)
     // First, receive and validate the handshake magic string
     std::optional<std::string> handshake_opt = read_delimited_message(client_socket, received_data_leftover);
     if (!handshake_opt) {
+        remove_client(client_socket);
+        shutdown(client_socket, SD_SEND);
         CLOSE_SOCKET(client_socket);
         std::cerr << "Client disconnected during handshake or sent no data." << std::endl;
         return;
@@ -128,6 +131,8 @@ void ChatServer::handle_client(int client_socket)
     // Read username
     std::optional<std::string> username_opt = read_delimited_message(client_socket, received_data_leftover);
     if (!username_opt) {
+        remove_client(client_socket);
+        shutdown(client_socket, SD_SEND);
         CLOSE_SOCKET(client_socket);
         std::cerr << "Client disconnected during username reception or sent no data." << std::endl;
         return;
@@ -137,6 +142,8 @@ void ChatServer::handle_client(int client_socket)
     // Read password
     std::optional<std::string> password_opt = read_delimited_message(client_socket, received_data_leftover);
     if (!password_opt) {
+        remove_client(client_socket);
+        shutdown(client_socket, SD_SEND);
         CLOSE_SOCKET(client_socket);
         std::cerr << "Client disconnected during password reception or sent no data." << std::endl;
         return;
@@ -150,6 +157,8 @@ void ChatServer::handle_client(int client_socket)
         } else {
             std::string reg_failed_msg = COLOR_RED "[Server]: Registration failed for user: " + username + ". Please try again." COLOR_RESET "\n";
             send(client_socket, reg_failed_msg.c_str(), static_cast<int>(reg_failed_msg.length()), 0);
+            remove_client(client_socket);
+            shutdown(client_socket, SD_SEND);
             CLOSE_SOCKET(client_socket);
             std::cerr << "Registration failed for user: " << username << std::endl;
             return;
@@ -160,6 +169,8 @@ void ChatServer::handle_client(int client_socket)
     if (!user_manager_.authenticateUser(username, password)) {
         std::string auth_failed_msg = COLOR_RED "[Server]: Authentication failed. Invalid username or password." COLOR_RESET "\n";
         send(client_socket, auth_failed_msg.c_str(), static_cast<int>(auth_failed_msg.length()), 0);
+        remove_client(client_socket);
+        shutdown(client_socket, SD_SEND);
         CLOSE_SOCKET(client_socket);
         std::cerr << "Authentication failed for user: " << username << std::endl;
         return;
@@ -336,6 +347,18 @@ void ChatServer::process_chat_command(int client_socket, const std::string& send
             std::string info_msg = COLOR_YELLOW "[Server]: " + recipient_username + " is offline. Message stored." COLOR_RESET "\n";
             send(client_socket, info_msg.c_str(), static_cast<int>(info_msg.length()), 0);
         }
+
+    } else if (message == "/quit") {
+        std::string goodbye_msg = COLOR_YELLOW "[Server]: You have successfully disconnected." COLOR_RESET "\n";
+        send(client_socket, goodbye_msg.c_str(), static_cast<int>(goodbye_msg.length()), 0);
+        remove_client(client_socket); // Remove client BEFORE closing socket
+#ifdef _WIN32
+        shutdown(client_socket, SD_SEND);
+#else
+        shutdown(client_socket, SHUT_RDWR);
+#endif
+        CLOSE_SOCKET(client_socket);
+        return; // Exit thread for this client
 
     } else { // Not a recognized command, treat as public chat
         std::string formatted = "[" + sender_username + "]: " + message + "\n";
