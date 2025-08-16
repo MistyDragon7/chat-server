@@ -4,38 +4,35 @@
 #include <thread>
 #include <string>
 #include "../include/Common.hpp" // Include Common.hpp
-// #include <cstring>
 
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <iphlpapi.h>
-#pragma comment(lib, "ws2_32.lib")
-#pragma comment(lib, "iphlpapi.lib")
+#pragma comment(lib, "ws2_32.lib") // Link with ws2_32.lib for Winsock functions
 #else
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#include <netdb.h>
-#include <ifaddrs.h>
-#include <netinet/in.h>
-#include <net/if.h>
 #endif
 
+// Define cross-platform socket close.
 #ifdef _WIN32
 #define CLOSE_SOCKET closesocket
 #else
 #define CLOSE_SOCKET close
 #endif
 
+// ChatClient class definition
 ChatClient::ChatClient(const std::string &server_ip, int port, const std::string &username, const std::string &password)
     : server_ip_(server_ip), port_(port), sock_(-1), username_(username), password_(password), connected_(false) {}
 
+// Destructor: Cleans up client resources.
 ChatClient::~ChatClient()
 {
     cleanup();
 }
 
+// Connects the client to the chat server.
 void ChatClient::connect_to_server()
 {
 #ifdef _WIN32
@@ -83,6 +80,7 @@ void ChatClient::connect_to_server()
     send(sock_, password_with_newline.c_str(), static_cast<int>(password_with_newline.length()), 0);
 }
 
+// Receives messages from the server and displays them.
 void ChatClient::receive_messages()
 {
     char buffer[1024];
@@ -109,6 +107,7 @@ void ChatClient::receive_messages()
     connected_ = false;
 }
 
+// Sends messages typed by the user to the server.
 void ChatClient::send_messages()
 {
     std::string message;
@@ -118,16 +117,9 @@ void ChatClient::send_messages()
         if (message == "/quit" || std::cin.eof())
             break;
 
-        // Check if the message is a command
-        if (message.rfind("/", 0) == 0) {
-            // It's a command, send as is (with a newline)
-            message += "\n";
-            send(sock_, message.c_str(), static_cast<int>(message.length()), 0);
-        } else {
-            // It's a regular chat message
-            message += "\n";
-            send(sock_, message.c_str(), static_cast<int>(message.length()), 0);
-        }
+        // Appends a newline and sends the message (or command) to the server.
+        message += "\n";
+        send(sock_, message.c_str(), static_cast<int>(message.length()), 0);
 
         std::cout << COLOR_CYAN << "> " << COLOR_RESET;
     }
@@ -137,6 +129,7 @@ void ChatClient::send_messages()
               << COLOR_RESET;
 }
 
+// Runs the chat client, connecting to the server and managing message sending/receiving.
 void ChatClient::run()
 {
     connect_to_server();
@@ -146,6 +139,7 @@ void ChatClient::run()
     cleanup();
 }
 
+// Cleans up socket resources.
 void ChatClient::cleanup()
 {
     if (sock_ != -1)

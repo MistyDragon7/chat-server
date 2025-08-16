@@ -4,9 +4,10 @@
 
 // No getLocalIPAddress function for cross-platform simplicity
 
+// Main function to run the chat client application.
 int main()
 {
-    // Removed getLocalIPAddress() call
+    // Removed getLocalIPAddress() call as it's no longer used.
     // std::string localIP = getLocalIPAddress();
     // std::cout << "Your local IP address is: " << localIP << std::endl;
 
@@ -22,9 +23,9 @@ int main()
     std::cout << "Enter your password: ";
     std::getline(std::cin, password);
 
-    int port = 9000;
+    int port = 9000; // Default server port
     ChatClient client(serverIP, port, username, password);
-    client.run();
+    client.run(); // Start the client application
 
     return 0;
 }
