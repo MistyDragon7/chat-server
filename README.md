@@ -1,6 +1,34 @@
-How to build?
+# Chat Server
 
-This project uses CMake. The build steps vary slightly depending on your operating system.
+A simple C++ chat application featuring a server and client, designed to demonstrate real-time communication.
+
+## Features
+
+*   **Real-time Messaging:** Exchange messages instantly between connected clients.
+*   **Multi-client Support:** Handles multiple concurrent client connections.
+*   **Command-line Interface:** Simple text-based interface for both server and client.
+*   **JSON Communication:** Uses JSON for structured message exchange between server and client.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+*   **CMake:** Version 3.10 or higher.
+*   **C++ Compiler:**
+    *   **Windows:** Visual Studio (e.g., Visual Studio 2022)
+    *   **Linux/macOS:** GCC or Clang (C++17 or later recommended)
+*   **Git** (optional, for cloning the repository)
+
+## Building the Project
+
+This project uses CMake for cross-platform building.
+
+### Cloning the Repository (Optional)
+
+```bash
+git clone https://github.com/your-username/chat-server.git
+cd chat-server
+```
 
 ### Windows
 
@@ -24,40 +52,79 @@ cmake ..
 make
 ```
 
-How to run?
+## Running the Application
 
-### Windows
+### Running the Server
 
-After building, navigate to the output directory (e.g., `build\Debug` or `build\Release`) and run the executables:
-
-In one terminal (for the server):
-
-```powershell
-cd build\Debug # Or build\Release
-.\chat_server.exe
-```
-
-In another terminal (for the client):
-
-```powershell
-cd build\Debug # Or build\Release
-.\chat_client.exe
-```
-
-### Linux/macOS
-
-After building, navigate to the `build` directory and run the executables:
-
-In one terminal (for the server):
+Open a terminal and navigate to the `build` directory:
 
 ```bash
 cd build
-./chat_server
+./chat_server # Linux/macOS
+.\Debug\chat_server.exe # Windows (or Release if built in Release mode)
 ```
 
-In another terminal (for the client):
+### Running the Client
+
+Open another terminal and navigate to the `build` directory:
 
 ```bash
 cd build
-./chat_client
+./chat_client # Linux/macOS
+.\Debug\chat_client.exe # Windows (or Release if built in Release mode)
 ```
+
+## Docker Setup
+
+You can also run the server and client using Docker.
+
+### Build Docker Images
+
+```bash
+docker build -t chat-server-image .
+```
+
+### Run Server in Docker
+
+```bash
+docker run -p 12345:12345 -d --name chat-server chat-server-image ./chat_server
+```
+
+### Run Client in Docker
+
+```bash
+docker run -it --rm --network host chat-server-image ./chat_client
+```
+
+## Project Structure
+
+```
+.
+├── client/                 # Client-side source code
+│   ├── ChatClient.cpp
+│   └── main.cpp
+├── include/                # Header files
+│   ├── ChatClient.hpp
+│   ├── ChatServer.hpp
+│   ├── Color.hpp
+│   ├── Common.hpp
+│   ├── nlohmann/           # JSON library
+│   │   └── json.hpp
+│   └── user/
+│       ├── User.hpp
+│       └── UserManager.hpp
+├── server/                 # Server-side source code
+│   ├── ChatServer.cpp
+│   └── main.cpp
+├── user/                   # User management source code
+│   ├── User.cpp
+│   └── UserManager.cpp
+├── CMakeLists.txt          # CMake build configuration
+├── Dockerfile              # Docker build file
+├── LICENSE                 # Project license
+└── README.md               # This README file
+```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

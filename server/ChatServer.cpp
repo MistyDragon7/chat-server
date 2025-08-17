@@ -395,7 +395,11 @@ void ChatServer::disconnect_client(int client_socket, const std::string& usernam
     std::string goodbye_message = COLOR_YELLOW "[Server]: " + username + " has left the chat." COLOR_RESET "\n";
     broadcast(goodbye_message, client_socket); // Broadcast before removing client
     remove_client(client_socket);
-    // Shutdown and close the socket
+#ifdef _WIN32
     shutdown(client_socket, SD_SEND);
-    CLOSE_SOCKET(client_socket);
+    closesocket(client_socket);
+#else
+    shutdown(client_socket, SHUT_WR);
+    close(client_socket);
+#endif
 }
