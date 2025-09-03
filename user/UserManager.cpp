@@ -1,29 +1,26 @@
 #include "../include/user/UserManager.hpp"
 #include <fstream>
-#include <filesystem> // Re-added for std::filesystem::exists and std::filesystem::file_size
+#include <filesystem>
 #include "../include/nlohmann/json.hpp"
-#include <iostream> // For std::cerr
+#include <iostream>
 
 using json = nlohmann::json;
 
-// Constructor: Initializes UserManager and ensures the data file exists and is valid.
+// Initializes UserManager, ensuring the user data file exists and is valid, then loads data.
 UserManager::UserManager(const std::string& filename) : dataFile(filename) {
-    // Check if the data file exists and is not empty
     if (!std::filesystem::exists(dataFile) || std::filesystem::file_size(dataFile) == 0) {
-        // If not, create it and initialize with an empty JSON object
         std::ofstream outFile(dataFile);
         if (outFile.is_open()) {
             outFile << "{}";
         }
     } else {
-        // If file exists, validate its JSON content; overwrite if corrupted
         std::ifstream checkFile(dataFile);
         std::string content((std::istreambuf_iterator<char>(checkFile)),
                             std::istreambuf_iterator<char>());
         checkFile.close();
         try {
-            json::parse(content); // Try to parse to validate
-        } catch (const json::parse_error& e) {
+            nlohmann::json::parse(content);
+        } catch (const nlohmann::json::parse_error& e) {
             std::cerr << "Corrupted JSON file detected: " << dataFile << ". Overwriting with empty object. Error: " << e.what() << std::endl;
             std::ofstream outFile(dataFile);
             if (outFile.is_open()) {
@@ -31,38 +28,39 @@ UserManager::UserManager(const std::string& filename) : dataFile(filename) {
             }
         }
     }
-    loadFromFile(); // Load valid data from the file
+    loadFromFile();
 }
 
 // Loads user data from the JSON file into memory.
 void UserManager::loadFromFile() {
     std::ifstream inFile(dataFile);
-    if (!inFile.is_open()) return; // Exit if file cannot be opened
+    if (!inFile.is_open()) return;
 
     std::string content((std::istreambuf_iterator<char>(inFile)),
                         std::istreambuf_iterator<char>());
-    inFile.close(); // Ensure file is closed after reading
+    inFile.close();
 
     if (content.empty()) {
-        return; // Nothing to load if file is empty
+        return;
     }
 
-    json j;
+    nlohmann::json j;
     try {
-        j = json::parse(content);
-    } catch (const json::parse_error& e) {
+        j = nlohmann::json::parse(content);
+    } catch (const nlohmann::json::parse_error& e) {
         std::cerr << "JSON parse error in " << dataFile << ": " << e.what() << std::endl;
-        return; // Exit if JSON is invalid
+        return;
     }
-    // Populate users map from parsed JSON data
+
+    // Populate users map from parsed JSON data.
     for (const auto& [username, data] : j.items()) {
-        User user(username, ""); // Initialize user
+        User user(username, "");
         user.passwordHash = data["passwordHash"].get<std::string>();
         user.friends = data["friends"].get<std::unordered_set<std::string>>();
         user.incomingRequests = data["incomingRequests"].get<std::unordered_set<std::string>>();
         user.outgoingRequests = data["outgoingRequests"].get<std::unordered_set<std::string>>();
 
-        // Load chat history for the user
+        // Load chat history for the user.
         for (const auto& [friendName, messages] : data["chatHistory"].items()) {
             for (const auto& msg : messages) {
                 std::string sender = msg["sender"];
@@ -70,22 +68,23 @@ void UserManager::loadFromFile() {
                 user.storeMessage(friendName, sender, content);
             }
         }
-        users.emplace(username, user); // Add user to the map
+        users.emplace(username, user);
     }
 }
 
 // Saves the current state of user data to the JSON file.
 void UserManager::saveToFile() const {
-    json j; // Create JSON object for saving
-    // Populate JSON object from users map
+    nlohmann::json j;
+
+    // Populate JSON object from users map.
     for (const auto& [username, user] : users) {
-        json userJson;
+        nlohmann::json userJson;
         userJson["passwordHash"] = user.passwordHash;
         userJson["friends"] = user.friends;
         userJson["incomingRequests"] = user.incomingRequests;
         userJson["outgoingRequests"] = user.outgoingRequests;
 
-        // Save chat history
+        // Save chat history.
         for (const auto& [friendName, messages] : user.chatHistory) {
             for (const auto& msg : messages) {
                 userJson["chatHistory"][friendName].push_back({
@@ -95,110 +94,109 @@ void UserManager::saveToFile() const {
             }
         }
 
-        j[username] = userJson; // Add user's data to the main JSON object
+        j[username] = userJson;
     }
 
-    std::ofstream outFile(dataFile); // Open file for writing
-    outFile << j.dump(4); // Write formatted JSON to file
+    std::ofstream outFile(dataFile);
+    outFile << j.dump(4);
 }
 
 // Checks if a user exists in the system.
 bool UserManager::userExists(const std::string& username) const {
-    return users.count(username) > 0; // Use count for existence check
+    return users.count(username) > 0;
 }
 
-// Registers a new user if the username is not already taken.
+// Registers a new user if the username is not already taken and persists changes.
 bool UserManager::registerUser(const std::string& username, const std::string& password) {
     if (userExists(username)) return false;
-    users.emplace(username, User(username, password)); // Add new user
-    saveToFile(); // Persist changes
+    users.emplace(username, User(username, password));
+    saveToFile();
     return true;
 }
 
 // Authenticates a user by checking their username and password.
 bool UserManager::authenticateUser(const std::string& username, const std::string& password) const {
     auto it = users.find(username);
-    return it != users.end() && it->second.checkPassword(password); // Check existence and password
+    return it != users.end() && it->second.checkPassword(password);
 }
 
-// Retrieves a mutable User object by username.
+// Retrieves a mutable User object by username, if found.
 std::optional<std::reference_wrapper<User>> UserManager::getUser(const std::string& username) {
     auto it = users.find(username);
-    if (it == users.end()) return std::nullopt; // Return nullopt if user not found
-    return it->second; // Return a reference to the user
+    if (it == users.end()) return std::nullopt;
+    return it->second;
 }
 
-// Retrieves a const User object by username.
+// Retrieves a const User object by username, if found.
 std::optional<std::reference_wrapper<const User>> UserManager::getUser(const std::string& username) const {
     auto it = users.find(username);
-    if (it == users.end()) return std::nullopt; // Return nullopt if user not found
-    return it->second; // Return a const reference to the user
+    if (it == users.end()) return std::nullopt;
+    return it->second;
 }
 
-// Sends a friend request from one user to another.
+// Sends a friend request from one user to another, with validation and persistence.
 bool UserManager::sendFriendRequest(const std::string& from, const std::string& to) {
-    if (!userExists(from) || !userExists(to) || from == to) return false; // Validate users and prevent self-request
+    if (!userExists(from) || !userExists(to) || from == to) return false;
 
     User& sender = users.at(from);
     User& receiver = users.at(to);
 
-    // Prevent duplicate or already accepted requests
+    // Prevent duplicate or already accepted requests.
     if (sender.hasSentRequestTo(to) || receiver.hasPendingRequestFrom(from) || sender.hasFriend(to)) return false;
 
-    sender.sendFriendRequestTo(to); // Update sender's outgoing requests
-    receiver.receiveFriendRequestFrom(from); // Update receiver's incoming requests
-    saveToFile(); // Persist changes
+    sender.sendFriendRequestTo(to);
+    receiver.receiveFriendRequestFrom(from);
+    saveToFile();
     return true;
 }
 
-// Accepts a friend request.
+// Accepts a friend request, updating both users' states and persisting changes.
 bool UserManager::acceptFriendRequest(const std::string& username, const std::string& from) {
-    if (!userExists(username) || !userExists(from)) return false; // Validate users
+    if (!userExists(username) || !userExists(from)) return false;
 
     User& receiver = users.at(username);
     User& sender = users.at(from);
 
-    if (!receiver.hasPendingRequestFrom(from)) return false; // No pending request to accept
+    if (!receiver.hasPendingRequestFrom(from)) return false;
 
-    bool success = receiver.acceptFriendRequestFrom(from); // Receiver accepts
+    bool success = receiver.acceptFriendRequestFrom(from);
     if (success) {
-        sender.completeOutgoingFriendRequest(username); // Sender completes outgoing request
+        sender.completeOutgoingFriendRequest(username);
     }
 
-    saveToFile(); // Persist changes
-    return success; // Return true only if receiver successfully accepted
+    saveToFile();
+    return success;
 }
 
-// Rejects a friend request from a sender.
+// Rejects a friend request, updating both users' states and persisting changes.
 bool UserManager::rejectFriendRequest(const std::string& rejecting_username, const std::string& sender_username) {
-    if (!userExists(rejecting_username) || !userExists(sender_username)) return false; // Validate users
+    if (!userExists(rejecting_username) || !userExists(sender_username)) return false;
 
     User& rejector = users.at(rejecting_username);
     User& sender = users.at(sender_username);
 
-    if (!rejector.hasPendingRequestFrom(sender_username)) return false; // No pending request to reject
+    if (!rejector.hasPendingRequestFrom(sender_username)) return false;
 
-    rejector.rejectFriendRequestFrom(sender_username); // Reject request for rejector
-    sender.cancelOutgoingFriendRequest(rejecting_username); // Cancel outgoing request for sender
-    saveToFile(); // Persist changes
+    rejector.rejectFriendRequestFrom(sender_username);
+    sender.cancelOutgoingFriendRequest(rejecting_username);
+    saveToFile();
     return true;
 }
 
-// Retrieves a user's incoming friend requests.
+// Retrieves a user's incoming friend requests, if the user exists.
 std::optional<std::reference_wrapper<const std::unordered_set<std::string>>> UserManager::getIncomingFriendRequests(const std::string& username) const {
     auto it = users.find(username);
     if (it == users.end()) {
-        return std::nullopt; // Return nullopt if user not found
+        return std::nullopt;
     }
-    return it->second.getIncomingFriendRequests(); // Return const reference to incoming requests
+    return it->second.getIncomingFriendRequests();
 }
 
-// Stores a chat message between two users.
+// Stores a chat message between two users and persists changes.
 void UserManager::storeMessage(const std::string& sender, const std::string& receiver, const std::string& content) {
-    if (!userExists(sender) || !userExists(receiver)) return; // Validate users
+    if (!userExists(sender) || !userExists(receiver)) return;
 
-    // Store message for both sender and receiver
     users.at(sender).storeMessage(receiver, sender, content);
     users.at(receiver).storeMessage(sender, sender, content);
-    saveToFile(); // Persist changes
+    saveToFile();
 }

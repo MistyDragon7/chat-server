@@ -1,7 +1,7 @@
 #include "../include/user/User.hpp"
 #include <functional>
 
-// Constructor: Initializes a User object with a username and a hashed password.
+// Represents a chat user with their profile, friends, and chat history.
 User::User(const std::string& username, const std::string& password)
     : username(username), passwordHash(std::to_string(std::hash<std::string>{}(password))) {}
 
@@ -40,7 +40,7 @@ void User::receiveFriendRequestFrom(const std::string& other) {
     incomingRequests.insert(other);
 }
 
-// Accepts a pending friend request from the specified other user.
+// Accepts a pending friend request from the specified other user, adding them to friends.
 bool User::acceptFriendRequestFrom(const std::string& other) {
     if (incomingRequests.count(other)) {
         incomingRequests.erase(other);
@@ -53,8 +53,6 @@ bool User::acceptFriendRequestFrom(const std::string& other) {
 // Rejects a pending friend request from the specified sender.
 void User::rejectFriendRequestFrom(const std::string& sender_username) {
     incomingRequests.erase(sender_username);
-    // Also remove from the sender's outgoing requests if this method is called directly by UserManager
-    // This part will be handled in UserManager, which has access to both users
 }
 
 // Marks an outgoing friend request as completed and adds the user to friends.

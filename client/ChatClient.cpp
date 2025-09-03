@@ -3,7 +3,7 @@
 #include <iostream>
 #include <thread>
 #include <string>
-#include "../include/Common.hpp" // Include Common.hpp
+#include "../include/Common.hpp"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -15,14 +15,13 @@
 #include <sys/socket.h>
 #endif
 
-// Define cross-platform socket close.
 #ifdef _WIN32
 #define CLOSE_SOCKET closesocket
 #else
 #define CLOSE_SOCKET close
 #endif
 
-// ChatClient class definition
+// ChatClient class definition: Manages client-side chat operations.
 ChatClient::ChatClient(const std::string &server_ip, int port, const std::string &username, const std::string &password)
     : server_ip_(server_ip), port_(port), sock_(-1), username_(username), password_(password), connected_(false) {}
 
@@ -32,7 +31,7 @@ ChatClient::~ChatClient()
     cleanup();
 }
 
-// Connects the client to the chat server.
+// Connects the client to the chat server, performing handshake and authentication.
 void ChatClient::connect_to_server()
 {
 #ifdef _WIN32
@@ -69,10 +68,10 @@ void ChatClient::connect_to_server()
     }
 
     connected_ = true;
-    // Send handshake magic string immediately after connecting
+    // Send handshake magic string immediately after connecting.
     send(sock_, CLIENT_HANDSHAKE_MAGIC.c_str(), static_cast<int>(CLIENT_HANDSHAKE_MAGIC.length()), 0);
 
-    // Send username and password to server, each terminated by a newline
+    // Send username and password to server, each terminated by a newline.
     std::string username_with_newline = username_ + "\n";
     send(sock_, username_with_newline.c_str(), static_cast<int>(username_with_newline.length()), 0);
 
