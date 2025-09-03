@@ -74,6 +74,17 @@ cd build
 .\Debug\chat_client.exe # Windows (or Release if built in Release mode)
 ```
 
+## Client Commands
+
+Clients can interact with the server using the following commands:
+
+*   `/friend add <username>`: Sends a friend request to the specified user.
+*   `/friend accept <username>`: Accepts a pending friend request from the specified user.
+*   `/friend reject <username>`: Rejects a pending friend request from the specified user.
+*   `/msg <username> <message>`: Sends a direct message to the specified user.
+*   `/quit`: Disconnects from the chat server.
+*   `/pending`: Lists all incoming pending friend requests.
+
 ## Docker Setup
 
 You can also run the server and client using Docker.
